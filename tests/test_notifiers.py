@@ -70,14 +70,26 @@ async def test_discord_embed():
     assert body["content"].startswith("@here")
 
 
-async def test_broadcast_isolates_failures():
+async def test_broadcast_isolates_failures_and_retries():
     class Bad:
         name = "bad"
-        async def send(self, l, w): raise RuntimeError("down")
+        calls = 0
+        async def send(self, l, w):
+            Bad.calls += 1
+            raise RuntimeError("down")
+
+    class Flaky:
+        name = "flaky"
+        calls = 0
+        async def send(self, l, w):
+            Flaky.calls += 1
+            if Flaky.calls == 1:
+                raise RuntimeError("blip")
     reqs, c = recorder()
     l, w = sample()
-    res = await broadcast([Bad(), NtfyNotifier("t", client=c)], l, w)
-    assert res == {"bad": "down", "ntfy": None} and len(reqs) == 1
+    res = await broadcast([Bad(), Flaky(), NtfyNotifier("t", client=c)], l, w, retry_delay=0)
+    assert res == {"bad": "down", "flaky": None, "ntfy": None}
+    assert len(reqs) == 1 and Bad.calls == 3 and Flaky.calls == 2   # good channel not re-sent
 
 
 def test_formatting():

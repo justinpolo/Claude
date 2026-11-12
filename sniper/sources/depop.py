@@ -242,7 +242,7 @@ class DepopSource(Source):
         s = slug or ""
         if seller and s.lower().startswith(seller.lower() + "-"):
             s = s[len(seller) + 1:]
-        s = re.sub(r"-[0-9a-f]{3,6}$", "", s)  # trailing short hash
+        s = re.sub(r"-(?=[0-9a-f]*[0-9])[0-9a-f]{3,6}$", "", s)  # trailing hash like -1f3a (needs a digit)
         return s.replace("-", " ").strip().capitalize()
 
     def parse_product(self, prod: dict) -> Listing:

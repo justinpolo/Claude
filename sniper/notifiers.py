@@ -243,12 +243,30 @@ class DesktopNotifier(Notifier):
         if not self.sound:
             kw["audio"] = {"silent": "true"}
         # don't block the engine while the toast is on screen
-        asyncio.create_task(self._toast(f"{l.platform.title()}: {l.title}"[:120],
-                                        "\n".join(summary_lines(l)), **kw))
+        self._spawn(f"{l.platform.title()}: {l.title}"[:120], "\n".join(summary_lines(l)), kw)
 
     async def send_text(self, text: str):
         if self._toast:
-            asyncio.create_task(self._toast("Resale Sniper", text))
+            self._spawn("Resale Sniper", text, {})
+
+    _tasks: set = set()
+
+    def _spawn(self, title: str, body: str, kw: dict):
+        async def run():
+            try:
+                await self._toast(title, body, **kw)
+            except Exception as e:
+                if "image" in kw:   # some Windows builds reject remote images: retry without
+                    kw.pop("image")
+                    try:
+                        await self._toast(title, body, **kw)
+                        return
+                    except Exception as e2:
+                        e = e2
+                log.warning("desktop toast failed: %s", e)
+        t = asyncio.create_task(run())
+        self._tasks.add(t)          # keep a reference so it isn't garbage-collected
+        t.add_done_callback(self._tasks.discard)
 
 
 def build_notifiers(cfg: dict) -> list[Notifier]:
@@ -273,16 +291,31 @@ def build_notifiers(cfg: dict) -> list[Notifier]:
     return out
 
 
-async def broadcast(notifiers: list[Notifier], listing: Listing, watch: Watch) -> dict:
-    """Send to every channel concurrently. Returns {name: error or None}."""
+async def broadcast(notifiers: list[Notifier], listing: Listing, watch: Watch,
+                    retries: int = 2, retry_delay: float = 3.0) -> dict:
+    """Send to every channel concurrently. Channels that fail are retried a couple of times
+    (e.g. a Wi-Fi blip) so an alert is never silently lost. Returns {name: error or None}."""
     async def one(n):
         try:
             await n.send(listing, watch)
             return n.name, None
         except Exception as e:
-            log.error("notify via %s failed: %s", n.name, e)
-            return n.name, str(e)
-    return dict(await asyncio.gather(*(one(n) for n in notifiers)))
+            return n.name, str(e) or repr(e)
+    pending = list(notifiers)
+    results: dict = {}
+    for attempt in range(retries + 1):
+        res = dict(await asyncio.gather(*(one(n) for n in pending)))
+        results.update(res)
+        pending = [n for n in pending if res.get(n.name)]
+        if not pending:
+            break
+        for n in pending:
+            log.warning("notify via %s failed (attempt %d): %s", n.name, attempt + 1, res[n.name])
+        if attempt < retries:
+            await asyncio.sleep(retry_delay * (attempt + 1))
+    for n in pending:
+        log.error("notify via %s gave up: %s", n.name, results[n.name])
+    return results
 
 
 async def broadcast_text(notifiers: list[Notifier], text: str):

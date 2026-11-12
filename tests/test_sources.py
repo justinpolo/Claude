@@ -229,3 +229,10 @@ async def test_depop_api_403_tries_page_then_reports_blocked(fixture_json):
             return httpx.Response(403, text="<html>Forbidden</html>")
         return httpx.Response(200, text=page)
     assert len(await DepopSource({}, client=client_for(handler2)).search(W())) == 3
+
+
+def test_depop_title_from_slug_keeps_hex_looking_words():
+    t = DepopSource._title_from_slug
+    assert t("bob-the-north-face-nuptse-1f3a", "bob") == "The north face nuptse"
+    assert t("jo-vintage-cafe-racer-jacket-bead", "jo") == "Vintage cafe racer jacket bead"
+    assert t("carhartt-detroit-face", "") == "Carhartt detroit face"
