@@ -1,0 +1,50 @@
+# Resale Sniper settings. install.bat copies this to config.yaml - edit THAT file.
+
+poll:
+  interval_seconds: 20      # how often EACH watch is re-checked. Lower = faster alerts, higher ban risk.
+  min_gap_seconds: 3        # minimum spacing between requests to the same site (protects your IP)
+  jitter: 0.25
+  max_backoff_seconds: 900  # if a site blocks us we pause up to 15 min, then retry automatically
+
+platforms:
+  vinted:
+    enabled: true
+    domain: www.vinted.co.uk   # www.vinted.fr, www.vinted.de, www.vinted.com, ...
+  depop:
+    enabled: true
+    country: gb
+    currency: GBP
+
+notifications:
+  console: true
+
+  # RECOMMENDED - instant phone push with photo + one-tap "Buy" button that opens the app.
+  # Setup (2 min): see README "Telegram". Then run:  sniper.bat telegram-setup --token <TOKEN>
+  # You can also manage watches from your phone: /add nike dunk max=60 size=9
+  telegram:
+    enabled: false
+    bot_token: ""
+    chat_id: ""
+    commands: true
+
+  # No-account alternative: install the "ntfy" app, subscribe to a hard-to-guess topic name.
+  ntfy:
+    enabled: false
+    topic: ""                 # e.g. sniper-7f3k29xq  (anyone who knows it can read it!)
+    server: https://ntfy.sh
+    priority: 5
+
+  discord:
+    enabled: false
+    webhook_url: ""           # Server Settings > Integrations > Webhooks > Copy URL
+    mention: ""               # "@here" or "<@your_user_id>" to force a ping
+
+  desktop:                    # Windows toast (click opens the listing)
+    enabled: true
+    sound: true
+
+max_listing_age_minutes: 120  # skip old items bumped into the "newest" feed (0 = off)
+alert_on_start: false         # true = also alert listings that were already live at startup
+database: sniper.db
+log_file: sniper.log
+log_level: INFO

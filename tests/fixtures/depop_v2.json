@@ -1,0 +1,76 @@
+{
+ "meta": {
+  "resultCount": 3,
+  "cursor": "abc",
+  "hasMore": true
+ },
+ "products": [
+  {
+   "id": 456789123,
+   "slug": "vintagefinds-carhartt-detroit-jacket-brown-1f3a",
+   "price": {
+    "priceAmount": "85.00",
+    "currencyName": "GBP",
+    "nationalShippingCost": "4.50"
+   },
+   "preview": {
+    "150": "https://media-photos.depop.com/b1/1/150.jpg",
+    "640": "https://media-photos.depop.com/b1/1/640.jpg"
+   },
+   "sizes": [
+    "L"
+   ],
+   "status": "ONSALE",
+   "hasFreeShipping": false,
+   "brandName": "Carhartt",
+   "condition": "used_excellent",
+   "seller": {
+    "username": "vintagefinds"
+   },
+   "dateCreated": "2026-11-12T03:58:10.000Z"
+  },
+  {
+   "id": 456789100,
+   "slug": "bob-carhartt-detroit-jacket-blanket-lined",
+   "price": {
+    "priceAmount": "140.00",
+    "discountedPriceAmount": "110.00",
+    "currencyName": "GBP"
+   },
+   "preview": {
+    "150": "https://m/2/150.jpg"
+   },
+   "sizes": [
+    "M"
+   ],
+   "status": "ONSALE",
+   "condition": {
+    "id": "used_like_new"
+   }
+  },
+  {
+   "id": 456789050,
+   "slug": "carhartt-detroit-jacket-fake",
+   "price": {
+    "priceAmount": "25.00",
+    "currencyName": "GBP"
+   },
+   "pictures": [
+    {
+     "formats": {
+      "P0": {
+       "url": "https://m/3/p0.jpg"
+      }
+     }
+    }
+   ],
+   "sizes": [
+    {
+     "name": "XL"
+    }
+   ],
+   "description": "Carhartt style detroit jacket, not genuine, replica",
+   "condition": "used_good"
+  }
+ ]
+}

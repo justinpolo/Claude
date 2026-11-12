@@ -1,0 +1,13 @@
+# your personal settings & data (never commit tokens)
+config.yaml
+watches.yaml
+*.db
+*.db-wal
+*.db-shm
+*.log
+*.log.*
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/

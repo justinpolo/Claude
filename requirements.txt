@@ -1,0 +1,3 @@
+httpx>=0.27
+PyYAML>=6.0
+win11toast>=0.35; sys_platform == "win32"

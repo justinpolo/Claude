@@ -1,0 +1,47 @@
+# Your saved searches. The bot reloads this file automatically while running - no restart needed.
+# You can also add/remove watches from Telegram (/add, /list, /remove) or the command line
+# (sniper.bat add nike dunk max=60 size=9).
+#
+# Rules (all optional except id + query):
+#   platforms:      [vinted, depop]      (default: both)
+#   min_price / max_price                (listing price, in your site's currency)
+#   use_total_price: true                (Vinted: compare price incl. buyer-protection fee)
+#   min_condition:  fair | good | very_good | like_new | new | new_with_tags   (this or better)
+#   conditions:     [new, new_with_tags] (exact allow-list instead of a floor)
+#   sizes:          ["UK 9", "9.5", M]   (matches whole size tokens: "9" won't match "9.5")
+#   brands:         [nike]
+#   must_include:   [low, panda]         (every word must be in title/description)
+#   exclude:        [kids, gs, replica]  (none of these words may appear)
+#   max_age_minutes: 30                  (ignore bumped/relisted old items, when age is known)
+#   enabled: false                       (pause)
+#   vinted: {catalog_ids: [1231], brand_ids: [53]}   (advanced: raw Vinted filters)
+#   depop:  {brands: "nike"}                          (advanced: raw Depop params)
+#
+# Condition scale (Vinted / Depop):
+#   new_with_tags = New with tags      | -
+#   new           = New without tags   | Brand new
+#   like_new      = -                  | Like new
+#   very_good     = Very good          | Excellent
+#   good          = Good               | Good
+#   fair          = Satisfactory       | Fair
+
+watches:
+  - id: dunk-panda
+    query: nike dunk low panda
+    max_price: 60
+    min_condition: good
+    sizes: ["UK 9", "UK 9.5", "9", "9.5", "44"]
+    exclude: [kids, gs, toddler, replica, fake]
+
+  - id: carhartt-detroit
+    query: carhartt detroit jacket
+    max_price: 90
+    min_condition: very_good
+    sizes: [L, XL]
+    exclude: [style, inspired]
+
+  - id: arcteryx
+    query: arcteryx beta
+    platforms: [vinted]
+    max_price: 150
+    exclude: [kids]

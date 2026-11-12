@@ -1,0 +1,87 @@
+{
+ "items": [
+  {
+   "id": 5123456789,
+   "title": "Nike Dunk Low Panda",
+   "price": {
+    "amount": "45.0",
+    "currency_code": "GBP"
+   },
+   "total_item_price": {
+    "amount": "48.95",
+    "currency_code": "GBP"
+   },
+   "brand_title": "Nike",
+   "size_title": "UK 9",
+   "status": "Very good",
+   "url": "https://www.vinted.co.uk/items/5123456789-nike-dunk-low-panda",
+   "photo": {
+    "url": "https://images1.vinted.net/t/abc/f800/1.jpeg",
+    "full_size_url": "https://images1.vinted.net/t/abc/full/1.jpeg",
+    "high_resolution": {
+     "timestamp": 1794483383
+    }
+   },
+   "user": {
+    "id": 1,
+    "login": "sneakerhead22"
+   },
+   "is_promoted": false,
+   "favourite_count": 0
+  },
+  {
+   "id": 5123456700,
+   "title": "Nike dunk low kids",
+   "price": "18.00",
+   "currency": "GBP",
+   "brand_title": "Nike",
+   "size_title": "UK 3",
+   "status": "Good",
+   "url": "/items/5123456700-nike-dunk-low-kids",
+   "photo": {
+    "url": "https://images1.vinted.net/t/def/f800/2.jpeg",
+    "high_resolution": {
+     "timestamp": 1794483123
+    }
+   },
+   "user": {
+    "login": "mumof3"
+   }
+  },
+  {
+   "id": 5123456600,
+   "title": "Nike Dunk Low Retro White Black",
+   "price": {
+    "amount": "120.0",
+    "currency_code": "GBP"
+   },
+   "brand_title": "Nike",
+   "size_title": "UK 9 / EU 44",
+   "status": "New with tags",
+   "url": "https://www.vinted.co.uk/items/5123456600-nike-dunk",
+   "photo": null,
+   "user": {
+    "login": "reseller"
+   }
+  },
+  {
+   "id": 5123456500,
+   "title": "Dunk low",
+   "price": {
+    "amount": "30.0",
+    "currency_code": "GBP"
+   },
+   "brand_title": "Nike",
+   "size_title": "UK 9",
+   "status": "Satisfactory",
+   "url": "https://www.vinted.co.uk/items/5123456500-dunk-low",
+   "photo": {
+    "url": "x"
+   },
+   "user": {}
+  },
+  {
+   "bogus": true
+  }
+ ]
+}

@@ -1,0 +1,36 @@
+{
+ "products": [
+  {
+   "id": 999001,
+   "slug": "seller1-arcteryx-beta-ar",
+   "pricing": {
+    "currency_name": "GBP",
+    "original_price": {
+     "total_price": "200.00"
+    },
+    "discounted_price": {
+     "total_price": "180.00"
+    }
+   },
+   "pictures": [
+    [
+     {
+      "url": "https://m/a/p1.jpg"
+     }
+    ]
+   ],
+   "brand_name": "Arc'teryx",
+   "sizes": [
+    "M"
+   ],
+   "item_condition": "brand_new",
+   "user": {
+    "username": "seller1"
+   },
+   "date_created": 1794483403
+  }
+ ],
+ "meta": {
+  "cursor": "x"
+ }
+}
