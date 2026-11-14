@@ -33,6 +33,7 @@ DEFAULTS = {
     "database": "sniper.db",
     "log_level": "INFO",
     "log_file": "sniper.log",
+    "heartbeat_minutes": 5,         # print a "still alive" line this often (0 = off)
 }
 
 

@@ -175,3 +175,20 @@ async def test_broken_watches_file_keeps_old(tmp_path):
     wpath.write_text("watches:\n  - id: x\n    query: y\n    colour: red\n")
     eng.reload_watches(force=True)
     assert [w.id for w in eng.watches] == ["dunks"]
+
+
+async def test_heartbeat_logs_health(tmp_path, caplog):
+    import logging
+    eng, _ = make(tmp_path, {"vinted": FakeSource("vinted", [[]])}, [W()])
+    eng.health["vinted"].ok_polls = 7
+    eng.health["vinted"].last_ok = eng.clock()
+    n = {"c": 0}
+
+    async def fake_sleep(s):
+        n["c"] += 1
+        if n["c"] > 1:
+            eng.stop()
+    eng.sleep = fake_sleep
+    with caplog.at_level(logging.INFO, logger="sniper.engine"):
+        await eng.heartbeat()
+    assert "alive" in caplog.text and "vinted: 7 checks OK" in caplog.text

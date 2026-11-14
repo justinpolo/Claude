@@ -200,6 +200,25 @@ class Engine:
         except asyncio.TimeoutError:
             pass
 
+    async def heartbeat(self):
+        """Log a one-line 'still alive' summary so a quiet window doesn't look frozen."""
+        every = float(self.cfg.get("heartbeat_minutes", 5)) * 60
+        if every <= 0:
+            return
+        while not self._stop.is_set():
+            await self._wait(every)
+            if self._stop.is_set():
+                break
+            parts = []
+            for p, h in self.health.items():
+                if h.fail_streak:
+                    parts.append(f"{p}: FAILING x{h.fail_streak} ({h.last_error[:60]})")
+                else:
+                    ago = int(self.clock() - h.last_ok) if h.last_ok else -1
+                    parts.append(f"{p}: {h.ok_polls} checks OK, last {ago}s ago")
+            log.info("💓 alive · %s · %d alert(s) so far", " | ".join(parts) or "no sites",
+                     self.alerts_sent)
+
     async def housekeeping(self):
         while not self._stop.is_set():
             await self._wait(3600)
@@ -220,6 +239,7 @@ class Engine:
                              f"🟢 Resale Sniper started - {len(self.watches)} watch(es) on {names}.")
         tasks = [asyncio.create_task(self.platform_loop(p), name=f"loop-{p}") for p in self.sources]
         tasks.append(asyncio.create_task(self.housekeeping(), name="housekeeping"))
+        tasks.append(asyncio.create_task(self.heartbeat(), name="heartbeat"))
         tasks += [asyncio.create_task(t) for t in extra_tasks]
         try:
             await self._stop.wait()
