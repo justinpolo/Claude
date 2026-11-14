@@ -79,6 +79,7 @@ class Watch:
     sizes: list = field(default_factory=list)        # any of these (case-insensitive)
     brands: list = field(default_factory=list)       # any of these (substring, case-insensitive)
     must_include: list = field(default_factory=list) # every term must appear in title/desc
+    any_of: list = field(default_factory=list)       # at least ONE of these must appear
     exclude: list = field(default_factory=list)      # none of these may appear
     max_age_minutes: Optional[float] = None          # skip listings older than this (if known)
     use_total_price: bool = False                    # compare total (incl. fees) instead of price
@@ -98,12 +99,18 @@ class Watch:
         if not str(d.get("query", "")).strip():
             raise ValueError(f"watch '{d['id']}' needs a 'query'")
         d["id"] = str(d["id"]).strip()
-        for k in ("platforms", "conditions", "sizes", "brands", "must_include", "exclude"):
+        for k in ("platforms", "conditions", "sizes", "brands", "must_include", "any_of",
+                  "exclude"):
             v = d.get(k)
             if v is None:
                 d.pop(k, None)
-            elif isinstance(v, str):
-                d[k] = [x.strip() for x in v.split(",") if x.strip()]
+                continue
+            if isinstance(v, str):
+                v = v.split(",")
+            if not isinstance(v, list):
+                v = [v]
+            # drop blanks: `sizes: [""]` must mean "any size", not "match nothing"
+            d[k] = [str(x).strip() for x in v if x is not None and str(x).strip()]
         if "platforms" in d:
             d["platforms"] = [p.lower() for p in d["platforms"]]
             if d["platforms"] == ["all"]:

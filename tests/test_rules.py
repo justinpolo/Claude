@@ -120,3 +120,14 @@ def test_default_max_age_and_promoted():
     assert not matches(L(created_ts=now - 1800, promoted=True), W(), now)
     assert matches(L(created_ts=now - 60, promoted=True), W(), now)
     assert not matches(L(created_ts=None, promoted=True), W(), now)
+
+
+def test_any_of_and_blank_list_entries():
+    w = W(query="coach", brands=["coach"], any_of=["bag", "purse", "handbag", "crossbody", "tote"])
+    assert matches(L(title="Coach Tabby shoulder bag", brand="Coach", size=""), w)
+    assert matches(L(title="Vintage coach purse brown", brand="Coach", size=""), w)
+    assert not matches(L(title="Coach leather wallet", brand="Coach"), w)
+    assert not matches(L(title="Nike coach jacket", brand="Nike"), w)
+    blank = W(sizes=[""], brands=["", None])
+    assert blank.sizes == [] and blank.brands == []
+    assert matches(L(size=""), blank)

@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 HELP = """<b>Resale Sniper commands</b>
 /add <i>search words</i> [options] - new watch
    max=50  min=10  cond=very_good+  size=M,L
-   brand=nike  not=kids,fake  on=vinted|depop|all  id=myname
+   brand=nike  not=kids,fake  any=bag,purse,tote  on=vinted|depop|all  id=myname
    e.g. <code>/add nike dunk low max=60 size=9,9.5 cond=good+</code>
 /list - show watches
 /pause <i>id</i> · /resume <i>id</i> · /remove <i>id</i>
@@ -34,7 +34,7 @@ Add <b>+</b> to mean "this or better"."""
 KEYMAP = {
     "max": "max_price", "under": "max_price", "min": "min_price", "over": "min_price",
     "size": "sizes", "sizes": "sizes", "brand": "brands", "brands": "brands",
-    "not": "exclude", "exclude": "exclude", "must": "must_include", "need": "must_include",
+    "not": "exclude", "exclude": "exclude", "must": "must_include", "need": "must_include", "any": "any_of", "anyof": "any_of",
     "on": "platforms", "platform": "platforms", "id": "id", "name": "id",
     "cond": "condition", "condition": "condition", "age": "max_age_minutes",
 }
@@ -65,7 +65,7 @@ def parse_add(args: str, existing_ids: set) -> Watch:
     for k in ("max_price", "min_price", "max_age_minutes"):
         if k in opts:
             d[k] = float(re.sub(r"[^\d.]", "", opts[k]))
-    for k in ("sizes", "brands", "exclude", "must_include"):
+    for k in ("sizes", "brands", "exclude", "must_include", "any_of"):
         if k in opts:
             d[k] = [x.strip() for x in opts[k].split(",") if x.strip()]
     if "platforms" in opts:
@@ -104,6 +104,8 @@ def describe(w: Watch) -> str:
         rules.append("not " + ",".join(w.exclude))
     if w.must_include:
         rules.append("needs " + ",".join(w.must_include))
+    if w.any_of:
+        rules.append("any of " + "/".join(w.any_of))
     rules.append("on " + "+".join(w.platforms))
     return bits[0] + "\n   " + " · ".join(rules)
 

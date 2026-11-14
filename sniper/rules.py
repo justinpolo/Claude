@@ -64,6 +64,8 @@ def check(listing: Listing, watch: Watch, now: Optional[float] = None,
     for term in watch.must_include:
         if not _contains_term(text, term):
             return f"missing '{term}'"
+    if watch.any_of and not any(_contains_term(text, t) for t in watch.any_of):
+        return f"none of {watch.any_of}"
     for term in watch.exclude:
         if _contains_term(text, term):
             return f"excluded '{term}'"

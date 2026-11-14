@@ -11,6 +11,7 @@
 #   sizes:          ["UK 9", "9.5", M]   (matches whole size tokens: "9" won't match "9.5")
 #   brands:         [nike]
 #   must_include:   [low, panda]         (every word must be in title/description)
+#   any_of:         [bag, purse, tote]   (at least one of these words must appear)
 #   exclude:        [kids, gs, replica]  (none of these words may appear)
 #   max_age_minutes: 30                  (ignore bumped/relisted old items, when age is known)
 #   enabled: false                       (pause)

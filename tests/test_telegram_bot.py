@@ -77,3 +77,8 @@ def test_yaml_roundtrip(tmp_path):
                            "vinted": {"catalog_ids": [1]}})]
     save_watches(ws, p)
     assert load_watches(p) == ws
+
+
+def test_parse_add_any_of():
+    w = parse_add("coach brand=coach any=bag,purse,tote max=200", set())
+    assert w.any_of == ["bag", "purse", "tote"] and w.brands == ["coach"]
