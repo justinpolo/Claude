@@ -45,12 +45,12 @@ class World:
 W = World()
 
 
-def vinted_item(i, title, price, status="Very good", size="UK 9"):
+def vinted_item(i, title, price, status="Very good", size="UK 9", age_s=0):
     return {"id": i, "title": title, "price": {"amount": str(price), "currency_code": "GBP"},
             "total_item_price": {"amount": f"{price * 1.05 + 0.7:.2f}", "currency_code": "GBP"},
             "brand_title": title.split()[0], "size_title": size, "status": status,
             "url": f"https://www.vinted.co.uk/items/{i}-x",
-            "photo": {"url": f"https://img/v{i}.jpg", "high_resolution": {"timestamp": int(time.time())}},
+            "photo": {"url": f"https://img/v{i}.jpg", "high_resolution": {"timestamp": int(time.time() - age_s)}},
             "user": {"login": "seller"}}
 
 
@@ -159,7 +159,7 @@ def main():
     (tmp / "config.yaml").write_text(json.dumps({
         "poll": {"interval_seconds": args.interval, "min_gap_seconds": 0.5, "jitter": 0.2},
         "platforms": {"vinted": {"base_url": base},
-                      "depop": {"endpoints": [base + "/api/v3/search/products/", base + "/depop-search/"]}},
+                      "depop": {"enabled": True, "endpoints": [base + "/api/v3/search/products/", base + "/depop-search/"]}},
         "notifications": {"console": False, "telegram": {
             "enabled": True, "bot_token": "TEST", "chat_id": "4242", "api_base": base}},
         "database": str(tmp / "sniper.db"), "log_file": str(tmp / "sniper.log"),
@@ -197,6 +197,9 @@ def main():
             else:
                 W.upload("depop", depop_item(nid, f"bob-carhartt-detroit-jacket-{nid}", 70 + k))
                 expected.add(f"depop:{nid}")
+        # an OLD matching listing (low id, 3 days old) gets bumped to the top of the feed
+        W.upload("vinted", vinted_item(900, "Nike Dunk Low Panda", 30, age_s=3 * 86400))
+        decoys.add("vinted:900")
         # live /add from "phone"
         send_command("/add stone island max=150 on=vinted")
         time.sleep(args.interval + 2)  # baseline for the new watch
