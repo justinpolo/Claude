@@ -11,7 +11,9 @@ platforms:
     enabled: true
     domain: www.vinted.co.uk   # www.vinted.fr, www.vinted.de, www.vinted.com, ...
   depop:
-    enabled: true
+    # OFF: as of Nov 2026 Depop blocks all non-browser access (HTTP 403 "Forbidden - Depop",
+    # and its v3 search API is retired). Turn on and run `sniper.bat doctor` to re-check later.
+    enabled: false
     country: gb
     currency: GBP
 

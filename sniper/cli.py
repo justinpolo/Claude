@@ -130,6 +130,8 @@ async def cmd_doctor(args, cfg):
         print(f"❌ watches file: {e}")
     probe = Watch.from_dict({"id": "doctor", "query": "nike"})
     sources = build_sources(cfg)
+    if not cfg["platforms"].get("depop", {}).get("enabled", False):
+        print("ℹ️  depop: disabled in config.yaml (Depop currently blocks automated access)")
     for name, src in sources.items():
         t0 = time.perf_counter()
         try:
@@ -146,6 +148,12 @@ async def cmd_doctor(args, cfg):
             ok = False
             print(f"❌ {name}: BLOCKED - {e}")
             _print_attempts(src)
+            if name == "depop":
+                print("   Depop refuses automated access (not something a browser visit fixes).\n"
+                      "   Set platforms.depop.enabled: false in config.yaml; Vinted keeps working.")
+            else:
+                print("   Open the site in a normal browser on this PC (solve any check), wait\n"
+                      "   10-15 min, turn off any VPN, and raise min_gap_seconds in config.yaml.")
         except SourceError as e:
             ok = False
             print(f"❌ {name}: {e}")

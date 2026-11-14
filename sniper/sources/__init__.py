@@ -10,6 +10,6 @@ def build_sources(cfg: dict, client=None) -> dict:
     pcfg = cfg.get("platforms", {})
     if pcfg.get("vinted", {}).get("enabled", True):
         out["vinted"] = VintedSource(pcfg.get("vinted", {}), client=client)
-    if pcfg.get("depop", {}).get("enabled", True):
+    if pcfg.get("depop", {}).get("enabled", False):
         out["depop"] = DepopSource(pcfg.get("depop", {}), client=client)
     return out

@@ -20,8 +20,10 @@ from .base import BlockedError, Source, SourceError, to_float
 
 log = logging.getLogger(__name__)
 
+# v3 answers 410 "Deprecated endpoint" (confirmed Nov 2026); v2 and the search page answer
+# 403 "Forbidden - Depop" to any non-browser client. Kept so the source starts working again
+# automatically if Depop reopens access.
 DEFAULT_ENDPOINTS = [
-    "https://webapi.depop.com/api/v3/search/products/",
     "https://webapi.depop.com/api/v2/search/products/",
     "https://www.depop.com/search/",   # HTML page; products read from its embedded JSON
 ]

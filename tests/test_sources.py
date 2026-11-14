@@ -4,6 +4,10 @@ import pytest
 from sniper.models import Watch
 from sniper.sources import BlockedError, DepopSource, SourceError, VintedSource
 
+ALL_DEPOP = {"endpoints": ["https://webapi.depop.com/api/v3/search/products/",
+                           "https://webapi.depop.com/api/v2/search/products/",
+                           "https://www.depop.com/search/"]}
+
 
 def W(**kw):
     return Watch.from_dict({"id": "w", "query": "nike dunk", **kw})
@@ -144,7 +148,7 @@ async def test_depop_v3_falls_back_to_v2(fixture_json):
         assert q["priceMax"] == "100" and q["conditions"] == "brand_new,used_excellent,used_like_new"
         return httpx.Response(200, json=fixture_json("depop_v2.json"))
 
-    src = DepopSource({}, client=client_for(handler))
+    src = DepopSource(ALL_DEPOP, client=client_for(handler))
     w = Watch.from_dict({"id": "c", "query": "carhartt detroit", "max_price": 100,
                          "min_condition": "very_good"})
     items = await src.search(w)
@@ -197,7 +201,7 @@ async def test_depop_html_page_fallback(fixture_json):
         assert req.url.params["q"] == "carhartt" and req.url.params["sort"] == "newlyListed"
         return httpx.Response(200, text=page, headers={"content-type": "text/html"})
 
-    src = DepopSource({}, client=client_for(handler))
+    src = DepopSource(ALL_DEPOP, client=client_for(handler))
     items = await src.search(Watch.from_dict({"id": "c", "query": "carhartt"}))
     assert [i.price for i in items] == [85.0, 110.0, 25.0]
     assert items[0].url.startswith("https://www.depop.com/products/vintagefinds-")
@@ -236,3 +240,8 @@ def test_depop_title_from_slug_keeps_hex_looking_words():
     assert t("bob-the-north-face-nuptse-1f3a", "bob") == "The north face nuptse"
     assert t("jo-vintage-cafe-racer-jacket-bead", "jo") == "Vintage cafe racer jacket bead"
     assert t("carhartt-detroit-face", "") == "Carhartt detroit face"
+
+
+def test_depop_defaults_skip_retired_v3():
+    eps = DepopSource({}).endpoints
+    assert not any("/v3/" in e for e in eps) and eps[-1] == "https://www.depop.com/search/"

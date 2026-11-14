@@ -4,6 +4,12 @@ Watches **Depop** and **Vinted** for new listings that match your rules (price, 
 brand, keywords…) and pings your phone the moment one appears, with the photo, price, size and a
 one-tap **🛒 Buy** button that opens the listing straight in the Depop/Vinted app.
 
+> **Status (Nov 2026):** ✅ **Vinted works**: verified live on Windows. ⛔ **Depop is off by
+> default.** Depop has retired its v3 search API (HTTP 410) and returns `403 Forbidden` to
+> every non-browser client, including its own search page. That is a deliberate block, not a
+> bug, and this tool doesn't try to get around it. The Depop code is kept: if Depop reopens
+> access, set `platforms.depop.enabled: true` and run `sniper.bat doctor` to check.
+
 - **Free to run**: no servers, no paid APIs, no proxies. It runs on your Windows PC.
 - **Fast**: every watch is re-checked about every 20 s (configurable), so alerts typically land
   within seconds of the upload.
@@ -136,7 +142,7 @@ automatically (30 s → 1 min → 2 min … up to 15 min) and messages you.
 | `doctor` says **BLOCKED** / HTTP 403 | Open the site in your normal browser on the same PC and pass any check. Wait 10–15 min. Raise `min_gap_seconds`. VPNs often trigger this, so turn them off. |
 | `HTML page instead of JSON` | Same as above (bot-check page). |
 | Vinted works but finds nothing in your country | Set `platforms.vinted.domain` (e.g. `www.vinted.fr`) |
-| Depop prices in the wrong currency | `platforms.depop.country` / `currency` |
+| `doctor` says depop BLOCKED with `Forbidden - Depop` | Expected: Depop blocks automated access. Leave `platforms.depop.enabled: false`. |
 | No Telegram messages | `sniper.bat test-notify`. Make sure you sent your bot a message before `telegram-setup`. |
 | Parsing warnings | Run `sniper.bat --log-level DEBUG doctor` and look at the output; the sites change their APIs from time to time. |
 
@@ -157,8 +163,9 @@ watches.yaml ─┐
 - **Vinted**: `https://api.vinted.<tld>/svc-catalogue/items?order=newest_first…` using the
   anonymous session cookie the homepage sets (same as the website). Falls back automatically to
   the older `/api/v2/catalog/items`.
-- **Depop**: `webapi.depop.com/api/v3|v2/search/products?sort=newlyListed`. Falls back
-  automatically to reading the product data embedded in the `depop.com/search` page.
+- **Depop** (disabled, see Status): `webapi.depop.com/api/v2/search/products?sort=newlyListed`,
+  falling back to the product data embedded in the `depop.com/search` page. `doctor` prints
+  every attempt with a diagnosis (retired / Cloudflare challenge / hard 403).
 - Price and condition filters are sent to the site to keep responses small, and all rules are
   re-checked locally.
 - When a watch's search changes, it re-baselines quietly so you don't get flooded with old

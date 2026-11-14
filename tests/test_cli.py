@@ -59,10 +59,13 @@ async def test_doctor_lists_every_depop_attempt(monkeypatch, fixture_json, tmp_p
                                            "content-type": "text/html"})
         return httpx.Response(200, text="home") if req.url.path == "/" else httpx.Response(200, json={"items": []})
     c = httpx.AsyncClient(transport=httpx.MockTransport(h))
-    monkeypatch.setattr(cli, "build_sources", lambda cfg: {"depop": DepopSource({}, client=c)})
+    eps = {"endpoints": ["https://webapi.depop.com/api/v3/search/products/",
+                         "https://webapi.depop.com/api/v2/search/products/", "https://www.depop.com/search/"]}
+    monkeypatch.setattr(cli, "build_sources", lambda cfg: {"depop": DepopSource(eps, client=c)})
     rc = await cli.cmd_doctor(argparse.Namespace(watches=str(tmp_path / "n.yaml")), load_config(tmp_path / "x"))
     out = capsys.readouterr().out
     assert rc == 1
     assert "v3/search/products/ -> HTTP 404" in out
     assert "v2/search/products/ -> HTTP 403 · text/html · server=awselb/2.0 · title='Forbidden'" in out
     assert "www.depop.com/search/ -> HTTP 403" in out and "=> Cloudflare bot challenge" in out
+    assert "Depop refuses automated access" in out

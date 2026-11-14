@@ -18,7 +18,8 @@ DEFAULTS = {
     },
     "platforms": {
         "vinted": {"enabled": True, "domain": "www.vinted.co.uk", "per_page": 30},
-        "depop": {"enabled": True, "country": "gb", "currency": "GBP", "per_page": 24},
+        # Depop currently refuses automated clients (HTTP 403), so it is off by default.
+        "depop": {"enabled": False, "country": "gb", "currency": "GBP", "per_page": 24},
     },
     "notifications": {
         "console": True,
