@@ -45,7 +45,9 @@ notifications:
     enabled: true
     sound: true
 
-max_listing_age_minutes: 120  # skip old items bumped into the "newest" feed (0 = off)
+fresh_only: true              # only alert genuinely NEW uploads (skips old items bumped into the feed)
+fresh_grace_minutes: 10       # listed within the last 10 min always counts as fresh
+max_listing_age_minutes: 30   # never alert anything older than this, when its age is known (0 = off)
 alert_on_start: false         # true = also alert listings that were already live at startup
 database: sniper.db
 log_file: sniper.log

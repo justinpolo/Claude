@@ -119,6 +119,44 @@ def _print_attempts(src):
             print(f"     - {a}")
 
 
+async def cmd_feedcheck(args, cfg):
+    """Show how 'fresh' the platform's newest-first feed really is (ordering, ages, bumps)."""
+    from .notifiers import age_text
+    w = Watch.from_dict({"id": "feedcheck", "query": args.query, "platforms": [args.platform]})
+    sources = build_sources({**cfg, "platforms": {**cfg["platforms"],
+                                                  args.platform: {**cfg["platforms"].get(args.platform, {}),
+                                                                  "enabled": True}}})
+    src = sources[args.platform]
+    try:
+        first = await src.search(w)
+        print(f"\n=== {args.platform} '{args.query}': {len(first)} results, in the order the site returned ===")
+        print(f"{'id':>14}  {'listed':>12}  promo  title")
+        for l in first[:args.limit]:
+            print(f"{l.id:>14}  {age_text(l.created_ts) or '?':>12}  {'yes' if l.promoted else '':5}  {l.title[:50]}")
+        ids = [int(l.id) for l in first if str(l.id).isdigit()]
+        ages = [l.created_ts for l in first if l.created_ts]
+        desc_ids = sum(a > b for a, b in zip(ids, ids[1:]))
+        print(f"\nids in newest-first order : {desc_ids}/{max(len(ids) - 1, 0)} pairs")
+        if ages:
+            import time as _t
+            mins = sorted((_t.time() - a) / 60 for a in ages)
+            print(f"listing ages              : newest {mins[0]:.0f} min · median {mins[len(mins)//2]:.0f} min · oldest {mins[-1]:.0f} min")
+        print(f"promoted items            : {sum(l.promoted for l in first)}")
+        if args.wait:
+            print(f"\nwaiting {args.wait}s to see what appears next...")
+            await asyncio.sleep(args.wait)
+            second = await src.search(w)
+            seen = {l.id for l in first}
+            top = max(ids) if ids else 0
+            new = [l for l in second if l.id not in seen]
+            print(f"{len(new)} listing(s) not in the first fetch:")
+            for l in new:
+                kind = "NEW upload" if str(l.id).isdigit() and int(l.id) > top else "old item resurfaced"
+                print(f"  {l.id:>14}  {age_text(l.created_ts) or '?':>10}  {kind:20}  {l.title[:45]}")
+    finally:
+        await src.close()
+
+
 async def cmd_doctor(args, cfg):
     ok = True
     print(f"Resale Sniper {__version__} · Python {sys.version.split()[0]} · {sys.platform}")
@@ -257,6 +295,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--size", action="append")
     s.add_argument("--limit", type=int, default=10)
     sub.add_parser("doctor", help="check connectivity, parsing and config")
+    f = sub.add_parser("feedcheck", help="inspect how fresh a site's newest-first feed is")
+    f.add_argument("query")
+    f.add_argument("--platform", default="vinted", choices=["vinted", "depop"])
+    f.add_argument("--wait", type=int, default=90, help="seconds before a 2nd fetch (0 = skip)")
+    f.add_argument("--limit", type=int, default=15)
     sub.add_parser("test-notify", help="send a sample alert to every channel")
     t = sub.add_parser("telegram-setup", help="link your Telegram bot (finds your chat id)")
     t.add_argument("--token")
@@ -273,7 +316,7 @@ def main(argv=None) -> int:
     _setup_logging(args.log_level or cfg.get("log_level", "INFO"),
                    cfg.get("log_file") if args.cmd == "run" else None)
     fn = {"run": cmd_run, "search": cmd_search, "doctor": cmd_doctor,
-          "test-notify": cmd_test_notify, "telegram-setup": cmd_telegram_setup,
+          "test-notify": cmd_test_notify, "feedcheck": cmd_feedcheck, "telegram-setup": cmd_telegram_setup,
           "add": cmd_add, "list": cmd_list}[args.cmd]
     if sys.platform == "win32" and sys.version_info < (3, 8):
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())

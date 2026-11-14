@@ -17,6 +17,10 @@ CREATE TABLE IF NOT EXISTS baseline (
     scope TEXT PRIMARY KEY,
     created REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS watermark (
+    scope TEXT PRIMARY KEY,       -- watch fingerprint
+    max_id INTEGER NOT NULL       -- highest numeric listing id seen (ids only ever go up)
+);
 CREATE TABLE IF NOT EXISTS alerts (
     item_key TEXT PRIMARY KEY,
     watch_id TEXT NOT NULL,
@@ -42,6 +46,18 @@ class Store:
     def set_baseline(self, scope: str):
         with self._lock:
             self.db.execute("INSERT OR IGNORE INTO baseline VALUES (?,?)", (scope, time.time()))
+            self.db.commit()
+
+    def get_watermark(self, scope: str) -> Optional[int]:
+        with self._lock:
+            r = self.db.execute("SELECT max_id FROM watermark WHERE scope=?", (scope,)).fetchone()
+            return r[0] if r else None
+
+    def raise_watermark(self, scope: str, max_id: int):
+        with self._lock:
+            self.db.execute(
+                "INSERT INTO watermark VALUES (?,?) ON CONFLICT(scope) "
+                "DO UPDATE SET max_id=MAX(max_id, excluded.max_id)", (scope, max_id))
             self.db.commit()
 
     def filter_unseen(self, scope: str, keys: Iterable[str]) -> list[str]:

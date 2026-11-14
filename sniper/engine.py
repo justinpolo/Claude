@@ -66,7 +66,9 @@ class Engine:
         self.jitter = float(pc.get("jitter", 0.25))
         self.max_backoff = float(pc.get("max_backoff_seconds", 900))
         self.alert_on_start = bool(cfg.get("alert_on_start", False))
-        dma = cfg.get("max_listing_age_minutes", 120)
+        self.fresh_only = bool(cfg.get("fresh_only", True))
+        self.fresh_grace = float(cfg.get("fresh_grace_minutes", 10))
+        dma = cfg.get("max_listing_age_minutes", 30)
         self.default_max_age = float(dma) if dma not in (None, 0, "") else None
         self.health = {p: PlatformHealth() for p in sources}
         self.started = clock()
@@ -109,6 +111,12 @@ class Engine:
         scope = watch.fingerprint(platform)
         new_keys = set(self.store.filter_unseen(scope, [l.key for l in listings]))
         first_time = not self.store.has_baseline(scope)
+        # Listing ids only ever go up, so "id above the highest we've seen" = genuinely new.
+        # Old items bumped/promoted/reshuffled into the feed have lower ids and are skipped.
+        watermark = self.store.get_watermark(scope)
+        ids = [int(l.id) for l in listings if str(l.id).isdigit()]
+        if ids:
+            self.store.raise_watermark(scope, max(ids))
         if first_time:
             self.store.set_baseline(scope)
             if not self.alert_on_start:
@@ -121,9 +129,13 @@ class Engine:
         for l in listings:
             if l.key not in new_keys:
                 continue
-            reason = rules.check(l, watch, now, self.default_max_age)
+            reason = self._freshness(l, watermark, now)
+            if reason is None:
+                reason = rules.check(l, watch, now, self.default_max_age)
             if reason:
-                log.debug("[%s/%s] skip %s: %s", watch.id, platform, l.title[:40], reason)
+                log.info("[%s/%s] skip %s: %s", watch.id, platform, l.title[:40], reason) \
+                    if reason.startswith(("old listing", "not fresh", "too old")) else \
+                    log.debug("[%s/%s] skip %s: %s", watch.id, platform, l.title[:40], reason)
                 continue
             if not self.store.claim_alert(l.key, watch.id, l):
                 continue  # another watch already alerted this exact item
@@ -133,6 +145,21 @@ class Engine:
             self.alerts_sent += 1
             alerted.append(l)
         return alerted
+
+    def _freshness(self, l: Listing, watermark: Optional[int], now: float) -> Optional[str]:
+        """None if the listing looks freshly uploaded, else why not."""
+        if not self.fresh_only:
+            return None
+        age_min = (now - l.created_ts) / 60 if l.created_ts else None
+        if age_min is not None and age_min <= self.fresh_grace:
+            return None                      # clearly recent (covers drafts published late)
+        if str(l.id).isdigit() and watermark is not None:
+            if int(l.id) > watermark:
+                return None                  # newer than anything we've seen: new upload
+            return f"old listing resurfaced (id {l.id} <= newest seen {watermark})"
+        if age_min is None:
+            return None                      # no way to tell; let the rules decide
+        return f"not fresh ({age_min:.0f} min old)"
 
     def _gap(self, n: int) -> float:
         base = max(self.min_gap, self.interval / max(n, 1))

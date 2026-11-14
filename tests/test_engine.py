@@ -192,3 +192,31 @@ async def test_heartbeat_logs_health(tmp_path, caplog):
     with caplog.at_level(logging.INFO, logger="sniper.engine"):
         await eng.heartbeat()
     assert "alive" in caplog.text and "vinted: 7 checks OK" in caplog.text
+
+
+async def test_old_items_resurfacing_in_feed_are_not_alerted(tmp_path):
+    import time as _t
+    now = _t.time()
+
+    def V(i, age_min=None):
+        x = lst(i)
+        x.created_ts = now - age_min * 60 if age_min is not None else None
+        return x
+    src = FakeSource("vinted", [
+        [V(500, 3), V(480, 50), V(470, 90)],          # baseline -> watermark 500
+        [V(510, 1), V(300, 400), V(500, 3)],          # 510 new upload; 300 = old item bumped in
+        [V(495), V(520), V(510, 1)],                  # 495 (no age, id below wm) old; 520 new
+        [V(505, 4), V(520)],                          # 505 below wm but listed 4 min ago: draft published late
+    ])
+    eng, cap = make(tmp_path, {"vinted": src}, [W()])
+    for _ in range(4):
+        await eng.poll_watch("vinted", W())
+    assert [k for _, k in cap.alerts] == ["vinted:510", "vinted:520", "vinted:505"]
+
+
+async def test_fresh_only_off_restores_old_behaviour(tmp_path):
+    src = FakeSource("vinted", [[lst(500)], [lst(300), lst(500)]])
+    eng, cap = make(tmp_path, {"vinted": src}, [W()], fresh_only=False)
+    for _ in range(2):
+        await eng.poll_watch("vinted", W())
+    assert [k for _, k in cap.alerts] == ["vinted:300"]

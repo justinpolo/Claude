@@ -69,3 +69,30 @@ async def test_doctor_lists_every_depop_attempt(monkeypatch, fixture_json, tmp_p
     assert "v2/search/products/ -> HTTP 403 · text/html · server=awselb/2.0 · title='Forbidden'" in out
     assert "www.depop.com/search/ -> HTTP 403" in out and "=> Cloudflare bot challenge" in out
     assert "Depop refuses automated access" in out
+
+
+async def test_feedcheck(monkeypatch, fixture_json, tmp_path, capsys):
+    import time as _t
+    state = {"n": 0}
+
+    def h(req):
+        if req.url.path == "/":
+            return httpx.Response(200, text="home")
+        state["n"] += 1
+        data = fixture_json("vinted_catalog.json")
+        if state["n"] == 2:   # one genuinely new, one old item bumped in
+            data["items"].insert(0, {**data["items"][0], "id": 5999999999, "title": "Brand new upload"})
+            data["items"].append({**data["items"][0], "id": 4000000000, "title": "Old bumped item"})
+        return httpx.Response(200, json=data)
+    c = httpx.AsyncClient(transport=httpx.MockTransport(h))
+    monkeypatch.setattr(cli, "build_sources", lambda cfg: {"vinted": VintedSource({}, client=c)})
+
+    async def no_sleep(s):
+        pass
+    monkeypatch.setattr(cli.asyncio, "sleep", no_sleep)
+    args = argparse.Namespace(query="nike", platform="vinted", wait=1, limit=10)
+    await cli.cmd_feedcheck(args, load_config(tmp_path / "x"))
+    out = capsys.readouterr().out
+    assert "ids in newest-first order" in out
+    assert "NEW upload" in out and "Brand new upload" in out
+    assert "old item resurfaced" in out and "Old bumped item" in out

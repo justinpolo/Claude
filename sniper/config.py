@@ -29,7 +29,9 @@ DEFAULTS = {
         "desktop": {"enabled": False, "sound": True},
     },
     "alert_on_start": False,
-    "max_listing_age_minutes": 120, # ignore items older than this (bumps/relists); 0 = off        # True = also alert for listings already live at startup
+    "fresh_only": True,             # only alert genuinely new uploads (id/age based)
+    "fresh_grace_minutes": 10,      # anything listed within this many minutes counts as fresh
+    "max_listing_age_minutes": 30,  # hard ceiling on listing age when known; 0 = off        # True = also alert for listings already live at startup
     "database": "sniper.db",
     "log_level": "INFO",
     "log_file": "sniper.log",
