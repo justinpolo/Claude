@@ -1,9 +1,9 @@
 # Resale Sniper settings. install.bat copies this to config.yaml - edit THAT file.
 
 poll:
-  interval_seconds: 20      # how often EACH watch is re-checked. Lower = faster alerts, higher ban risk.
+  interval_seconds: 6       # how often EACH watch is re-checked. Lower = faster alerts, higher ban risk.
   min_gap_seconds: 3        # minimum spacing between requests to the same site (protects your IP)
-  jitter: 0.25
+  jitter: 0.2               # if the site pushes back (429/403) the bot slows itself down automatically
   max_backoff_seconds: 900  # if a site blocks us we pause up to 15 min, then retry automatically
 
 platforms:
@@ -45,9 +45,9 @@ notifications:
     enabled: true
     sound: true
 
-fresh_only: true              # only alert genuinely NEW uploads (skips old items bumped into the feed)
-fresh_grace_minutes: 10       # listed within the last 10 min always counts as fresh
-max_listing_age_minutes: 30   # never alert anything older than this, when its age is known (0 = off)
+fresh_only: true              # only alert uploads that are new since the previous check
+fresh_grace_minutes: 0        # 0 = strict. >0 also accepts older-id items listed this recently
+max_listing_age_minutes: 3    # never alert anything older than this (catches restarts after downtime)
 alert_on_start: false         # true = also alert listings that were already live at startup
 database: sniper.db
 log_file: sniper.log

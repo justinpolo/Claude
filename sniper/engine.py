@@ -40,9 +40,18 @@ class PlatformHealth:
     backoff_until: float = 0.0
     warned: bool = False
     latencies: list = field(default_factory=list)
+    slow_factor: float = 1.0        # >1 after the site pushed back; decays back to 1
+    ok_since_slow: int = 0
+    detect_ages: list = field(default_factory=list)  # seconds from upload to us seeing it
 
     def avg_latency(self) -> float:
         return sum(self.latencies) / len(self.latencies) if self.latencies else 0.0
+
+    def detect_median(self):
+        if not self.detect_ages:
+            return None
+        a = sorted(self.detect_ages)
+        return a[len(a) // 2]
 
 
 class Engine:
@@ -67,8 +76,8 @@ class Engine:
         self.max_backoff = float(pc.get("max_backoff_seconds", 900))
         self.alert_on_start = bool(cfg.get("alert_on_start", False))
         self.fresh_only = bool(cfg.get("fresh_only", True))
-        self.fresh_grace = float(cfg.get("fresh_grace_minutes", 10))
-        dma = cfg.get("max_listing_age_minutes", 30)
+        self.fresh_grace = float(cfg.get("fresh_grace_minutes", 0))
+        dma = cfg.get("max_listing_age_minutes", 3)
         self.default_max_age = float(dma) if dma not in (None, 0, "") else None
         self.health = {p: PlatformHealth() for p in sources}
         self.started = clock()
@@ -126,6 +135,10 @@ class Engine:
 
         alerted = []
         now = self.clock()
+        if watermark is not None:
+            for l in listings:
+                if l.created_ts and str(l.id).isdigit() and int(l.id) > watermark:
+                    h.detect_ages = (h.detect_ages + [max(0.0, now - l.created_ts)])[-50:]
         for l in listings:
             if l.key not in new_keys:
                 continue
@@ -139,8 +152,9 @@ class Engine:
                 continue
             if not self.store.claim_alert(l.key, watch.id, l):
                 continue  # another watch already alerted this exact item
-            log.info("[%s/%s] MATCH %s %.2f %s -> %s", watch.id, platform, l.title[:60],
-                     l.price, l.currency, l.url)
+            age = f"listed {now - l.created_ts:.0f}s ago" if l.created_ts else "age unknown"
+            log.info("[%s/%s] MATCH %s %.2f %s (%s) -> %s", watch.id, platform, l.title[:60],
+                     l.price, l.currency, age, l.url)
             await broadcast(self.notifiers, l, watch)
             self.alerts_sent += 1
             alerted.append(l)
@@ -151,18 +165,25 @@ class Engine:
         if not self.fresh_only:
             return None
         age_min = (now - l.created_ts) / 60 if l.created_ts else None
-        if age_min is not None and age_min <= self.fresh_grace:
-            return None                      # clearly recent (covers drafts published late)
+        if age_min is not None and age_min > self.default_max_age_or_inf():
+            return f"too old ({age_min * 60:.0f}s)"
+        if age_min is not None and self.fresh_grace > 0 and age_min <= self.fresh_grace:
+            return None                      # optional: drafts published late
         if str(l.id).isdigit() and watermark is not None:
             if int(l.id) > watermark:
                 return None                  # newer than anything we've seen: new upload
             return f"old listing resurfaced (id {l.id} <= newest seen {watermark})"
-        if age_min is None:
-            return None                      # no way to tell; let the rules decide
-        return f"not fresh ({age_min:.0f} min old)"
+        # no id history yet (e.g. the search had zero results at baseline): it is new to this
+        # search since the last check, and the age ceiling above already rejected stale ones
+        return None
 
-    def _gap(self, n: int) -> float:
+    def default_max_age_or_inf(self) -> float:
+        return self.default_max_age if self.default_max_age else float("inf")
+
+    def _gap(self, n: int, platform: Optional[str] = None) -> float:
         base = max(self.min_gap, self.interval / max(n, 1))
+        if platform in self.health:
+            base *= self.health[platform].slow_factor
         return base * random.uniform(1 - self.jitter, 1 + self.jitter)
 
     async def _record_failure(self, platform: str, err: Exception):
@@ -170,6 +191,11 @@ class Engine:
         h.fail_streak += 1
         h.last_error = str(err)
         blocked = isinstance(err, BlockedError)
+        if blocked:
+            # the site told us to slow down: halve our request rate (up to 8x slower)
+            h.slow_factor = min(h.slow_factor * 2, 8.0)
+            h.ok_since_slow = 0
+            log.warning("%s: slowing checks to %.0fx the normal gap", platform, h.slow_factor)
         base = 30 if blocked else 5
         delay = min(self.max_backoff, base * (2 ** min(h.fail_streak - 1, 8)))
         if blocked and err.retry_after:
@@ -187,6 +213,12 @@ class Engine:
         if h.warned:
             await broadcast_text(self.notifiers, f"✅ {platform.title()} checks are working again.")
         h.ok_polls += 1
+        if h.slow_factor > 1:
+            h.ok_since_slow += 1
+            if h.ok_since_slow >= 60:     # ~60 clean checks: speed back up a notch
+                h.slow_factor = max(1.0, h.slow_factor / 1.5)
+                h.ok_since_slow = 0
+                log.info("%s: speeding checks back up (%.1fx normal gap)", platform, h.slow_factor)
         h.fail_streak = 0
         h.warned = False
         h.last_ok = self.clock()
@@ -214,7 +246,7 @@ class Engine:
             except Exception as e:  # bug guard: log and keep going
                 log.exception("%s: unexpected error polling %s", platform, w.id)
                 await self._record_failure(platform, SourceError(repr(e)))
-            await self._wait(self._gap(len(ws)))
+            await self._wait(self._gap(len(ws), platform))
 
     async def _wait(self, seconds: float):
         if seconds <= 0:
@@ -242,7 +274,9 @@ class Engine:
                     parts.append(f"{p}: FAILING x{h.fail_streak} ({h.last_error[:60]})")
                 else:
                     ago = int(self.clock() - h.last_ok) if h.last_ok else -1
-                    parts.append(f"{p}: {h.ok_polls} checks OK, last {ago}s ago")
+                    med = h.detect_median()
+                    speed = f", new uploads seen ~{med:.0f}s after upload" if med is not None else ""
+                    parts.append(f"{p}: {h.ok_polls} checks OK, last {ago}s ago{speed}")
             log.info("💓 alive · %s · %d alert(s) so far", " | ".join(parts) or "no sites",
                      self.alerts_sent)
 
@@ -288,6 +322,12 @@ class Engine:
             else:
                 state = "⏳ starting"
             n = len(self.active_watches(p))
-            cycle = max(self.interval, n * self.min_gap) if n else 0
+            cycle = max(self.interval, n * self.min_gap) * h.slow_factor if n else 0
             lines.append(f"{p.title()}: {state}" + (f" · each watch every ~{cycle:.0f}s" if n else ""))
+            if h.slow_factor > 1:
+                lines.append(f"   🐢 slowed {h.slow_factor:.1f}x after the site pushed back")
+            med = h.detect_median()
+            if med is not None:
+                lines.append(f"   ⚡ new uploads spotted ~{med:.0f}s after upload "
+                             f"(median of last {len(h.detect_ages)})")
         return "\n".join(lines)

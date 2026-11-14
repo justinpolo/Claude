@@ -11,9 +11,9 @@ from .models import Watch
 
 DEFAULTS = {
     "poll": {
-        "interval_seconds": 20,     # target time between checks of the SAME watch
+        "interval_seconds": 6,      # target time between checks of the SAME watch
         "min_gap_seconds": 3.0,     # never hit one platform faster than this
-        "jitter": 0.25,             # +/- randomness so we don't look like a metronome
+        "jitter": 0.2,             # +/- randomness so we don't look like a metronome
         "max_backoff_seconds": 900,
     },
     "platforms": {
@@ -30,8 +30,8 @@ DEFAULTS = {
     },
     "alert_on_start": False,
     "fresh_only": True,             # only alert genuinely new uploads (id/age based)
-    "fresh_grace_minutes": 10,      # anything listed within this many minutes counts as fresh
-    "max_listing_age_minutes": 30,  # hard ceiling on listing age when known; 0 = off        # True = also alert for listings already live at startup
+    "fresh_grace_minutes": 0,       # >0: also accept lower-id items listed this recently
+    "max_listing_age_minutes": 3,   # never alert anything older than this (when known); 0 = off        # True = also alert for listings already live at startup
     "database": "sniper.db",
     "log_level": "INFO",
     "log_file": "sniper.log",

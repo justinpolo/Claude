@@ -11,7 +11,7 @@ one-tap **🛒 Buy** button that opens the listing straight in the Depop/Vinted 
 > access, set `platforms.depop.enabled: true` and run `sniper.bat doctor` to check.
 
 - **Free to run**: no servers, no paid APIs, no proxies. It runs on your Windows PC.
-- **Fast**: every watch is re-checked about every 20 s (configurable), so alerts typically land
+- **Fast**: every watch is re-checked about every 6 s (configurable), so alerts typically land
   within seconds of the upload.
 - **Accurate**: rules are re-checked locally, so "size 9" never matches "9.5" and `exclude: [kids]`
   really excludes. Items already listed when you add a watch are skipped, and you never get the
@@ -122,18 +122,28 @@ sniper.bat search "nike dunk" --max 60 --cond good --size "UK 9"   (preview + wh
 - Logs go to `sniper.log`.
 - **`update.bat`**: downloads the latest version (keeps your config, watches and history).
 
-## Speed vs. getting blocked
+## Speed: how fast you hear about a new upload
+
+Neither site offers a live feed of new uploads, so the bot checks each search very often and
+alerts only on listings that are **new since its previous check**. It uses Vinted's item IDs,
+which only ever go up, so old items bumped or promoted into the feed are ignored. As a backstop,
+nothing older than `max_listing_age_minutes` (default **3**) ever alerts.
 
 `config.yaml → poll`:
 
-- `interval_seconds: 20`: each watch is re-checked about this often.
-- `min_gap_seconds: 3`: never more than one request every 3 s per site, however many watches
-  you have. With many watches, each one is checked every `watches × 3 s`, e.g. 10 watches → 30 s.
+- `interval_seconds: 6`: each watch is re-checked about this often.
+- `min_gap_seconds: 3`: never more than one request every 3 s per site. With several watches,
+  each one is checked every `max(6 s, watches × 3 s)`, e.g. 1–2 watches → 6 s, 4 watches → 12 s.
+  **Fewer, broader watches = faster alerts.**
 
-Requests are spread evenly with random jitter, so the bot looks like a normal browser tab
-refreshing. Depop and Vinted are checked in parallel and don't slow each other down. Going much
-faster than these defaults risks temporary IP blocks. If you get blocked, the bot backs off
-automatically (30 s → 1 min → 2 min … up to 15 min) and messages you.
+Time from upload to alert ≈ Vinted's own delay in showing the item in search + up to one check
+interval + ~1 s delivery. `/status` and the 5-minute heartbeat show the **measured** figure
+("new uploads spotted ~8 s after upload"), and `sniper.bat feedcheck <query>` shows the raw feed.
+
+If Vinted pushes back (HTTP 429/403), the bot automatically slows down: 2× per push-back, up to
+8×. It pauses briefly, then speeds back up after about 60 clean checks, so a block doesn't
+escalate into a long IP ban. Lowering `min_gap_seconds` below 3 is possible but makes blocks
+more likely.
 
 ## Troubleshooting
 
@@ -171,7 +181,7 @@ watches.yaml ─┐
 - When a watch's search changes, it re-baselines quietly so you don't get flooded with old
   listings.
 - Old items that get bumped into the "newest" feed (promoted/relisted) are skipped via
-  `max_listing_age_minutes` (default 120).
+  their IDs (lower than the newest already seen) and `max_listing_age_minutes` (default 3).
 
 ## Development
 

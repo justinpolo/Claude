@@ -161,8 +161,8 @@ async def test_full_loop_round_robin_and_hot_reload(tmp_path):
     ids = [a[0] for a in cap.alerts]
     assert "one" in ids and "two" not in ids     # 'two' has max_price=10 -> never matches
     assert len(eng.watches) == 2                  # hot reload picked up the edit
-    # gap is interval / n_watches with jitter: 20s for 1 watch, 10s for 2 (+/-25%)
-    assert 15 <= slept[0] <= 25 and 7.5 <= slept[-1] <= 12.5
+    # gap = max(min_gap 3s, interval 6s / n_watches) +/-20%: 6s for 1 watch, 3s for 2
+    assert 4.8 <= slept[0] <= 7.2 and 2.4 <= slept[-1] <= 3.6
 
 
 async def test_broken_watches_file_keeps_old(tmp_path):
@@ -211,7 +211,36 @@ async def test_old_items_resurfacing_in_feed_are_not_alerted(tmp_path):
     eng, cap = make(tmp_path, {"vinted": src}, [W()])
     for _ in range(4):
         await eng.poll_watch("vinted", W())
-    assert [k for _, k in cap.alerts] == ["vinted:510", "vinted:520", "vinted:505"]
+    # strict default: only ids above the newest seen; 505 (4 min old) also exceeds the 3 min cap
+    assert [k for _, k in cap.alerts] == ["vinted:510", "vinted:520"]
+    med = eng.health["vinted"].detect_median()
+    assert med is not None and 50 <= med <= 70          # 510 was seen ~1 min after upload
+    assert "new uploads spotted ~" in eng.status_text()
+
+    # optional grace window re-admits a late-published draft
+    src.calls = 0
+    (tmp_path / "g").mkdir()
+    eng2, cap2 = make(tmp_path / "g", {"vinted": src}, [W()], fresh_grace_minutes=10,
+                      max_listing_age_minutes=30)
+    for _ in range(4):
+        await eng2.poll_watch("vinted", W())
+    assert [k for _, k in cap2.alerts] == ["vinted:510", "vinted:520", "vinted:505"]
+
+
+async def test_adaptive_slowdown_and_recovery(tmp_path):
+    eng, cap = make(tmp_path, {"vinted": FakeSource("vinted", [[]])}, [W()])
+    base = eng._gap(1, "vinted")
+    assert 4.8 <= base <= 7.2
+    await eng._record_failure("vinted", BlockedError("HTTP 429"))
+    await eng._record_failure("vinted", BlockedError("HTTP 429"))
+    assert eng.health["vinted"].slow_factor == 4.0
+    assert 19 <= eng._gap(1, "vinted") <= 29
+    assert "slowed 4.0x" in eng.status_text()
+    for _ in range(60):
+        await eng._record_ok("vinted")
+    assert abs(eng.health["vinted"].slow_factor - 4 / 1.5) < 1e-9
+    await eng._record_failure("vinted", SourceError("timeout"))   # plain errors don't slow us
+    assert abs(eng.health["vinted"].slow_factor - 4 / 1.5) < 1e-9
 
 
 async def test_fresh_only_off_restores_old_behaviour(tmp_path):
@@ -220,3 +249,14 @@ async def test_fresh_only_off_restores_old_behaviour(tmp_path):
     for _ in range(2):
         await eng.poll_watch("vinted", W())
     assert [k for _, k in cap.alerts] == ["vinted:300"]
+
+
+async def test_first_item_on_search_that_started_empty_is_alerted(tmp_path):
+    import time as _t
+    x = lst(9001)
+    x.created_ts = _t.time() - 5
+    src = FakeSource("vinted", [[], [x]])     # rare item: nothing listed at baseline
+    eng, cap = make(tmp_path, {"vinted": src}, [W()])
+    await eng.poll_watch("vinted", W())
+    await eng.poll_watch("vinted", W())
+    assert cap.alerts == [("dunks", "vinted:9001")]
