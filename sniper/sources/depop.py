@@ -29,6 +29,33 @@ JSON_SCRIPT_RE = re.compile(
     r'<script[^>]*type="application/(?:ld\+)?json"[^>]*>(.*?)</script>', re.S | re.I)
 
 
+def describe_response(r: httpx.Response) -> str:
+    """One-line diagnosis of a response: status, who answered, and what kind of page it was."""
+    h = r.headers
+    bits = [f"HTTP {r.status_code}", h.get("content-type", "?").split(";")[0]]
+    server = h.get("server", "")
+    if server:
+        bits.append(f"server={server}")
+    if h.get("cf-mitigated"):
+        bits.append(f"cf-mitigated={h['cf-mitigated']}")
+    if h.get("cf-ray"):
+        bits.append("via Cloudflare")
+    if h.get("x-amzn-errortype") or h.get("x-amz-cf-id"):
+        bits.append("via AWS/CloudFront")
+    text = r.text[:3000] if r.content else ""
+    m = re.search(r"<title[^>]*>(.*?)</title>", text, re.S | re.I)
+    if m:
+        bits.append(f"title={m.group(1).strip()[:60]!r}")
+    elif text:
+        bits.append(f"body={text[:100].strip()!r}")
+    low = text.lower()
+    if "just a moment" in low or "challenge-platform" in low or "cf-chl" in low:
+        bits.append("=> Cloudflare bot challenge")
+    elif "captcha" in low or "datadome" in low or "perimeterx" in low:
+        bits.append("=> captcha/bot wall")
+    return " · ".join(bits)
+
+
 def find_product_lists(obj, depth: int = 0) -> list:
     """Walk arbitrary JSON and return the longest list of product-looking dicts."""
     best: list = []
@@ -82,6 +109,7 @@ class DepopSource(Source):
         eps = self.cfg.get("endpoints") or DEFAULT_ENDPOINTS
         self.endpoints = [eps] if isinstance(eps, str) else list(eps)
         self._good_endpoint: Optional[str] = None
+        self.attempts: list[str] = []   # per-endpoint outcome of the last search (for `doctor`)
 
     def build_params(self, watch: Watch) -> list[tuple[str, str]]:
         p = [
@@ -104,7 +132,14 @@ class DepopSource(Source):
             p.append((k, ",".join(map(str, v)) if isinstance(v, list) else str(v)))
         return p
 
+    def _note(self, ep: str, r: Optional[httpx.Response] = None, err: str = ""):
+        if r is None:
+            self.attempts.append(f"{ep} -> {err}")
+            return
+        self.attempts.append(f"{ep} -> {describe_response(r)}")
+
     async def search(self, watch: Watch) -> list[Listing]:
+        self.attempts = []
         params = self.build_params(watch)
         headers = {"Accept": "application/json",
                    "Origin": "https://www.depop.com",
@@ -122,7 +157,9 @@ class DepopSource(Source):
                 r = await self.client.get(ep, params=params, headers=headers)
             except httpx.HTTPError as e:
                 last_err = SourceError(f"depop search: {e!r}")
+                self._note(ep, err=repr(e))
                 continue
+            self._note(ep, r)
             if r.status_code in (404, 410) and not self._good_endpoint:
                 last_err = SourceError(f"depop: endpoint {ep} gone ({r.status_code})")
                 continue
@@ -160,7 +197,9 @@ class DepopSource(Source):
             r = await self.client.get(url, params=params, headers={
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"})
         except httpx.HTTPError as e:
+            self._note(url, err=repr(e))
             raise SourceError(f"depop page: {e!r}") from e
+        self._note(url, r)
         self._raise_for(r, "depop page")
         products = self.products_from_html(r.text)
         if products is None:

@@ -111,6 +111,14 @@ async def cmd_search(args, cfg):
             await s.close()
 
 
+def _print_attempts(src):
+    attempts = getattr(src, "attempts", None)
+    if attempts:
+        print("   tried:")
+        for a in attempts:
+            print(f"     - {a}")
+
+
 async def cmd_doctor(args, cfg):
     ok = True
     print(f"Resale Sniper {__version__} · Python {sys.version.split()[0]} · {sys.platform}")
@@ -136,11 +144,12 @@ async def cmd_doctor(args, cfg):
                 print(f"   ⚠️ parsing looks off - run with --log-level DEBUG and report the output")
         except BlockedError as e:
             ok = False
-            print(f"❌ {name}: BLOCKED - {e}\n   Open the site in a normal browser on this PC "
-                  f"(solve any check), wait 10-15 min, and lower poll speed in config.yaml.")
+            print(f"❌ {name}: BLOCKED - {e}")
+            _print_attempts(src)
         except SourceError as e:
             ok = False
             print(f"❌ {name}: {e}")
+            _print_attempts(src)
         finally:
             await src.close()
     notifiers = [n for n in build_notifiers(cfg) if n.name != "console"]

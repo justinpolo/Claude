@@ -44,3 +44,25 @@ async def test_search_shows_verdicts(monkeypatch, fixture_json, tmp_path, capsys
 async def test_test_notify_console(tmp_path, capsys):
     rc = await cli.cmd_test_notify(argparse.Namespace(), load_config(tmp_path / "x.yaml"))
     assert rc == 0 and "TEST ALERT" in capsys.readouterr().out
+
+
+async def test_doctor_lists_every_depop_attempt(monkeypatch, fixture_json, tmp_path, capsys):
+    def h(req):
+        if req.url.host == "webapi.depop.com" and "/v3/" in req.url.path:
+            return httpx.Response(404, json={"message": "not found"})
+        if req.url.host == "webapi.depop.com":
+            return httpx.Response(403, text="<html><title>Forbidden</title></html>",
+                                  headers={"server": "awselb/2.0", "content-type": "text/html"})
+        if req.url.host == "www.depop.com":
+            return httpx.Response(403, text="<html><title>Just a moment...</title>challenge-platform</html>",
+                                  headers={"server": "cloudflare", "cf-ray": "1", "cf-mitigated": "challenge",
+                                           "content-type": "text/html"})
+        return httpx.Response(200, text="home") if req.url.path == "/" else httpx.Response(200, json={"items": []})
+    c = httpx.AsyncClient(transport=httpx.MockTransport(h))
+    monkeypatch.setattr(cli, "build_sources", lambda cfg: {"depop": DepopSource({}, client=c)})
+    rc = await cli.cmd_doctor(argparse.Namespace(watches=str(tmp_path / "n.yaml")), load_config(tmp_path / "x"))
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert "v3/search/products/ -> HTTP 404" in out
+    assert "v2/search/products/ -> HTTP 403 · text/html · server=awselb/2.0 · title='Forbidden'" in out
+    assert "www.depop.com/search/ -> HTTP 403" in out and "=> Cloudflare bot challenge" in out

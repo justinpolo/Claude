@@ -114,6 +114,7 @@ sniper.bat search "nike dunk" --max 60 --cond good --size "UK 9"   (preview + wh
 - **`autostart_on.bat`**: starts it (minimised) every time you log in. `autostart_off.bat` undoes this.
 - Set Windows **Sleep → Never** (while plugged in), or alerts stop while the PC sleeps.
 - Logs go to `sniper.log`.
+- **`update.bat`**: downloads the latest version (keeps your config, watches and history).
 
 ## Speed vs. getting blocked
 
